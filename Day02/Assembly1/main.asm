@@ -102,7 +102,7 @@ _start:
     push ebp
     mov ebp, esp
 
-    sub esp, 28 ; 6 ints,  char[2], 1 byte for check and 1 extra for alignment
+    sub esp, 32 ; 7 ints,  char[2], 1 byte for check and 1 extra for alignment
     mov eax, 0
     mov [esp + 4], eax ; initializes current sum to zero
     mov [esp + 12], eax ; initilizes current line to 0 
@@ -111,7 +111,9 @@ _start:
     mov eax, 13
     mov [esp + 20], eax ; store max_green_cubes
     mov eax, 14
-    mov [esp + 24], eax ; stor max_blue_cubes
+    mov [esp + 24], eax ; store max_blue_cubes
+    mov eax, 0
+    mov [esp + 28] , eax ; initialize holder (int a)
     mov eax, -1
     mov [esp + 8], eax ; initilizes fd to -1
     ; First this program assumes you have a file named "file.txt" that contains for your data so it tries to open it using the open syscall
@@ -154,11 +156,34 @@ _line_logic:
     lea edi, [char_buffer + ecx]
     call _getNum
     mov [esp + 12], eax ;update line counter
-    add ecx, 2 ; skips the ": " after the game number
+_line_get_game:
+    add ecx, 2 ; skips the ": " or "; " after the game number
+_line_get_values:
+    mov [esp + 28], dword 0 ; a = 0
     lea edi, [char_buffer + ecx]
     call _getNum
-    mov [esp + 4], eax
-
+    mov [esp + 28], eax ; a = getNum(char *str)
+    inc ecx ; skip the space after
+    lea edi, [char_buffer + ecx] ; move ahead
+    call check_possible
+    test ebx
+    je _line_log_exit
+    add ecx, eax
+    lea edi, [char_buffer + ecx] ; move ahead
+    movzx eax, byte [edi]
+    cmp eax, 10
+    je _line_logic_add
+    cmp eax, 0
+    je _line_logic_add
+_line_logic_exit:
+    jmp _readline_init
+_line_logic_add:
+    mov ebx, [esp + 4] ; load the sum value
+    mov edx, [esp + 28] ; load current line number
+    add ebx, edx
+    mov [esp+4] , ebx ; store new sum
+    cmp eax, 0
+    jne _line_logic_exit
 _close_file:
     mov eax, 6 ; syscall to close
     mov ebx, [esp + 8]
