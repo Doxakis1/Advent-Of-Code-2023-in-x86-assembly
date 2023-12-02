@@ -97,6 +97,38 @@ _getNum_ret: ;returns to caller and pops and incriments ecx
     add ecx, ebx ; adds new incriment
     ret
 
+check_possible: ; this requires that edi holds the index we want to check and it assumes no typos and no bad text, it returns 0 on ebx if the value is okay or 1 if it is not. if okay then eax holds how many characters to skip for next index
+    movzx eax, byte [edi] ; loads char to eax
+    cmp eax, 'r'
+    je _check_red
+    cmp eax, 'b'
+    je _check_blue
+    cmp eax, 'g'
+    je _check_green
+    mov eax, 1
+    jmp _check_possible_ret ; jmps in case of error (but god bless if there is an error lol)
+_check_red:
+    mov edx, 12 ; moves max_red_value to ebx
+    mov eax, 3 ; skip 3 chars
+    cmp ebx, edx 
+    jg _check_possible_ret
+    mov ebx, 0
+    jmp _check_possible_ret
+_check_blue:
+    mov edx, 14 ; moves max_blue_value to ebx
+    mov eax, 4 ; skip 4 chars
+    cmp ebx, edx
+    jg _check_possible_ret
+    mov ebx, 0
+    jmp _check_possible_ret
+_check_green:
+    mov edx, 13; moves max_green_value to ebx
+    mov eax, 5 ; skip 5 chars
+    cmp ebx, edx
+    jg _check_possible_ret
+    mov ebx, 0
+_check_possible_ret:
+    ret
 _start:
     ;prologue
     push ebp
@@ -106,12 +138,7 @@ _start:
     mov eax, 0
     mov [esp + 4], eax ; initializes current sum to zero
     mov [esp + 12], eax ; initilizes current line to 0 
-    mov eax, 12
-    mov [esp + 16], eax ;store max_red_cubes
-    mov eax, 13
-    mov [esp + 20], eax ; store max_green_cubes
     mov eax, 14
-    mov [esp + 24], eax ; store max_blue_cubes
     mov eax, 0
     mov [esp + 28] , eax ; initialize holder (int a)
     mov eax, -1
@@ -130,11 +157,11 @@ _readline_init: ;this the function I made for day01 to read a line either delime
     mov esi, char_buffer
     xor ecx, ecx
     mov [esp], dword 0 ;reset holder
+    mov [esp + 12], dword 0 ;reset index
     mov [char_buffer], dword 0 ; makes first chars 0s of the buffer
 _readline_loop:
-    mov ecx, [esp + 12]
     lea esi, [char_buffer + ecx]
-    mov eax, 3 ; syscall to write
+    mov eax, 3 ; syscall to read
     mov ebx, [esp + 8]
     lea ecx, [esi]
     mov edx, 1
@@ -145,13 +172,18 @@ _readline_loop:
     movzx eax, byte [esi] ; zero extend move one byte from where esi points to eax
     cmp eax , 10 ; test for new lines
     je _line_logic
-    mov ecx, [esp + 12]
-    inc ecx
-    mov [esp + 12], ecx
+    mov ecx, dword [esp + 12] ; index into ecx
+    inc ecx ;index++
+    mov [esp + 12], ecx 
     jmp _readline_loop
 
 _line_logic:
     xor ecx, ecx
+    mov [esp + 12], dword 0 ;reset current line
+    lea edi, [char_buffer + ecx]
+    movzx eax, byte [edi]
+    cmp eax, 0
+    je _close_file
     add ecx, 5 ; here we are skipping "Game " we just assume the file is correct xd...
     lea edi, [char_buffer + ecx]
     call _getNum
@@ -165,9 +197,10 @@ _line_get_values:
     mov [esp + 28], eax ; a = getNum(char *str)
     inc ecx ; skip the space after
     lea edi, [char_buffer + ecx] ; move ahead
+    mov ebx, [esp + 28]
     call check_possible
-    test ebx
-    je _line_log_exit
+    cmp ebx, 0
+    jne _line_logic_exit
     add ecx, eax
     lea edi, [char_buffer + ecx] ; move ahead
     movzx eax, byte [edi]
@@ -175,11 +208,12 @@ _line_get_values:
     je _line_logic_add
     cmp eax, 0
     je _line_logic_add
+    jmp _line_get_game
 _line_logic_exit:
     jmp _readline_init
 _line_logic_add:
     mov ebx, [esp + 4] ; load the sum value
-    mov edx, [esp + 28] ; load current line number
+    mov edx, [esp + 12] ; load current line number
     add ebx, edx
     mov [esp+4] , ebx ; store new sum
     cmp eax, 0
