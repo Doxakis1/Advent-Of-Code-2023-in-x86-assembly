@@ -309,8 +309,6 @@ _check_next:
     jmp _check_valid_loop
 
 _check_not_valid:
-    mov eax, [esp + 4]
-    ;call printnum
     mov eax, -1
     mov [esp + 4], eax
 _check_index_ret:
@@ -416,6 +414,7 @@ _find_nums_init:
     mov ecx, 1400
     mov [num_a], ecx
 _find_nums_loop:
+    mov ebx, 1
     mov ecx, [num_a] ; load next offset
     lea esi, [buffer + ecx]
     movzx eax, byte [esi]
@@ -435,6 +434,14 @@ _add_number:
     mov ecx, [sum]
     add ecx, eax
     mov [sum], ecx
+    ;push ebx
+    ;push edx
+    ;push ecx
+    ;call printnum
+    ;pop ecx
+    ;pop edx
+    ;pop ebx
+_check_sum:
     jmp _find_nums_loop_break
 _done:
     mov eax, [sum]
