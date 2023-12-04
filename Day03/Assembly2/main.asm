@@ -149,8 +149,9 @@ _getNum_ret:
 check_index: ;updates the stars counters on the map
     push ebp
     mov ebp, esp
+    push esi
     sub esp, 16 ; 4 dwords
-    
+
     mov [esp], esi ; store string[current_index]
     mov ebx, 1
     mov [esp + 8], ebx ; initialize skip index
@@ -172,6 +173,9 @@ _check_stars_init:
 _check_stars_loop:
     mov eax, [esp]
     mov ecx, [esp + 12]
+    add eax, ecx
+    mov esi, eax
+_check_loaded:
     mov edx, [esp + 8]
     cmp ecx, edx
     jge _check_index_ret
@@ -261,6 +265,7 @@ _check_backdiag2:
     mov ebx, [above]
     inc ebx
     lea edi, [esi + ebx]
+_check_b1:
     movzx ebx, byte [edi]
     call isDigit
     cmp ecx, 0
@@ -292,6 +297,7 @@ _check_next:
     jmp _check_stars_loop
 _check_index_ret:
     mov ebx, [esp + 8]
+    pop esi
     mov esp, ebp
     pop ebp
     ret
@@ -363,6 +369,7 @@ _got_line_length:
     inc ecx
     mov [linelength], ecx ; stored the line length
     mov [below], ecx ; initializes below
+here:
     imul ecx, -1
     mov [above], ecx ; init above
     mov ecx, 1
@@ -438,7 +445,7 @@ _done:
 _count_valid_gears:
     mov ecx, [num_a]
     lea esi, [buffer + ecx]
-here:
+_we_back:
     movzx eax, byte [esi]
     cmp eax, 0
     je _close_file
