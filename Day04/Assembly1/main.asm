@@ -19,7 +19,67 @@ section .bss
     buffer  resb BUFFER_SIZE ; I can increase if needed
 section .text
     global _start
+printnum: ; Number inside eax register
+    ;prologue
+    push ebp
+    mov ebp, esp
+    sub esp, 16 ; int array[4]
+    mov [esp + 12],dword eax ; move the number we want to print to array[3]
+    mov [esp + 8], dword 1000000000 ; array[2] = 1000000000 (this is biggest printed signed decimal significant)
+    mov [esp + 4], dword 0 ; array[1] = 0;
+    mov [esp],dword 0 ; array[0] = 0
+    
+_printnum_loop:
+    mov eax, [esp + 4]
+    cmp eax, -1
+    je _exit_printnum
+    xor edx, edx ; zero the remainder
+    mov ebx, [esp + 8] ; load divisor array[2] to ebx
+    cmp ebx, 1
+    je print_last
+    mov eax, [esp + 12] ; load array[3] to eax
+    mov ebx, [esp + 8]
+    div ebx ; devide eax by ebx
+    mov [esp + 12], edx ; move remainder to array[3]
+    mov [esp], eax ; load significant digit to array[0]
+    mov eax, [esp + 8] ; move the divisor to eax
+    xor edx, edx
+    mov ebx, 10
+    div ebx
+    mov [esp + 8], eax
+    mov eax, [esp] ; load the number to eax
+    add [esp + 4], eax ;using this to check that we never just print zeros
+    mov eax, [esp + 4]
+    test eax, eax
+    jne print_num
+    jmp _printnum_loop
+print_last:    
+    mov eax, [esp+12] ; move number to eax
+    mov [esp], eax ; move to array[0] our num
+    mov [esp + 4], dword -1
+print_num:
+    add [esp], dword '0'
 
+    mov eax, 4 ; syscall to write
+    mov ebx, 1 ; stdout
+    lea ecx, [esp] ; load array[0]
+    mov edx, 1 ; one char
+    int 0x80
+
+    jmp _printnum_loop
+    ;epilogue
+_exit_printnum:
+    mov [esp], dword 10
+
+    mov eax, 4 ; syscall to write
+    mov ebx, 1 ; stdout
+    lea ecx, [esp] ; load array[0]
+    mov edx, 1 ; one char
+    int 0x80
+
+    mov esp, ebp
+    pop ebp
+    ret
 _getNum: ;requires correct index on esi, returns the number on eax if it is a number else -1, and returns on ebx the index incriment
     push ebp
     mov ebp, esp
@@ -27,8 +87,6 @@ _getNum: ;requires correct index on esi, returns the number on eax if it is a nu
     
     xor eax, eax
     mov [esp+8], esi ; start index
-    mov eax, -1
-    mov [esp+4], eax ; number
     xor ecx, ecx
     mov [esp], ecx ; index
 _check_ifnum:
@@ -36,13 +94,15 @@ _check_ifnum:
     movzx ebx, byte [esi]
     cmp ebx, '0'
     jl _notNum
-    cmp ebx, '0'
+    cmp ebx, '9'
     jg _notNum
+    mov [esp+4], dword 0
 _isNum:
     mov ecx, [esp]
     mov edx, [esp+8]
     lea esi, [ecx + edx]
-    movzx ebx, byte [esi]
+    movsx ebx, byte [esi]
+_check_ebx:
     cmp ebx, '0'
     jl _getNum_ret
     cmp ebx, '9'
@@ -56,9 +116,12 @@ _isNum:
     sub ebx, '0'
     add eax, ebx
     mov [esp+4], eax
+added:
     jmp _isNum
 _notNum:
     mov [esp], dword 1
+    mov eax, -1
+    mov [esp+4], eax
 _getNum_ret:
     mov ebx, [esp]
     mov eax, [esp+4]
@@ -81,9 +144,10 @@ _open_file:
     mov [fd], eax
 
 _init:
+    mov [sum], dword 0
     mov [esp], dword 0
     mov [esp + 4] , dword 0
-_init_buffer:
+_repeat:
     mov ecx, [esp + 4]
 _initialize_buffer_loop:
     cmp ecx, BUFFER_SIZE
@@ -106,10 +170,10 @@ _find_start:
     mov ebx, [fd] ; int fd
     mov ecx, esp ; char *buf
     mov edx, 1 ; readsize
+    int 0x80
     cmp eax, 0 ; at the end of file
     jle _close_file
     movzx eax, byte [esp]
-_check_eax:
     cmp eax, ':'
     je _get_nums ; found start
     jmp _find_start
@@ -123,16 +187,18 @@ _get_nums_loop:
     mov ebx, [fd] ; int fd
     mov ecx, esi
     mov edx, 1 ; readsize
+    int 0x80
     cmp eax, 0 ; at the end of file/error
     jle _close_file
+    movzx eax, byte [esi]
     cmp eax, '|' ; end of nums
-    jmp _get_num_array
+    je _get_num_array
     mov ecx, [esp+4]
     inc ecx
     mov [esp+4], ecx
     jmp _get_nums_loop
 _get_num_array:
-    mov ecx, ecx
+    xor ecx, ecx
     mov [esp+4], ecx ; number counter
     mov [esp], ecx ; index counter
 _get_next_num:
@@ -140,8 +206,10 @@ _get_next_num:
     lea esi, [buffer + ecx]
     movzx ebx, byte [esi]
     cmp ebx, 0 
-    je _close_file ; end of scratch line now get numbers next
-    getNum
+    je _check_wins ; end of scratch line now get numbers next
+    push ecx
+    call _getNum
+    pop ecx
     add ecx, ebx
     mov [esp], ecx
     cmp eax, -1
@@ -152,9 +220,71 @@ _get_next_num:
     inc ecx
     mov [esp+4], ecx
     jmp _get_next_num
+_check_wins:
+    xor ecx, ecx
+    mov [esp + 4], ecx
+_get_win_loop:
+    mov ecx, [esp+4]
+    lea esi, [buffer + ecx]
+    mov eax, 3 ; sys_call read
+    mov ebx, [fd] ; int fd
+    mov ecx, esi
+    mov edx, 1 ; readsize
+    int 0x80
+    cmp eax, 0 ; at the end of file/error
+    jle _get_win_array
+    movzx eax, byte [esi]
+    cmp eax, 10 ; end of winnums
+    je _get_win_array
+    mov ecx, [esp+4]
+    inc ecx
+    mov [esp+4], ecx
+    jmp _get_win_loop
+_get_win_array:
+    xor ecx, ecx
+    mov [esp+4], ecx ; wins counter
+    mov [esp], ecx ; index counter
+_get_win_num:
+    mov ecx, dword [esp]
+    lea esi, [buffer + ecx]
+    movzx ebx, byte [esi]
+    cmp ebx, 0 
+    je _add_wins ; end of scratch line now get numbers next
+    push ecx
+    call _getNum
+    pop ecx
+    add ecx, ebx
+    mov [esp], ecx
+    cmp eax, -1
+    je _get_win_num
+_check_exist:
+    push ecx
+    call _check_winner
+    pop ecx
+    cmp eax, 1
+    jne _not_exist
+    mov ecx, dword [esp+4]
+    inc ecx
+    mov [esp+4], ecx
+_not_exist:
+    jmp _get_win_num
+_add_wins:
+    mov ebx, [esp + 4]
+    cmp ebx, 0
+    jle _repeat
+    mov eax, 1
+    dec ebx
+    mov cl, bl
+    shl eax, cl
+shifted:
+    mov ebx, dword [sum]
+    add ebx, eax
+    mov [sum], ebx
+    jmp _repeat
 
 _close_file:
-    mov edx, dword [esp+4]
+    mov eax, dword [sum]
+    call printnum
     mov eax, 6 ; sys_call close
     mov ebx, [fd] ; close arg
     int 0x80
@@ -165,3 +295,27 @@ _exit:
     mov eax, 1 ; sys_exit
     mov ebx, edx ; exit_code
     int 0x80
+
+_check_winner: ; needs number on eax
+    push ebp
+    mov ebp, esp
+    xor ecx, ecx
+
+_loop_winner:
+    lea esi, [numbers + ecx]
+    mov ebx, dword [esi]
+    cmp ebx, dword -1
+    je _no_winner
+    cmp ebx, eax
+    je _winner
+    add ecx, 4
+    jmp _loop_winner
+_winner:
+    mov eax, 1
+    jmp _winner_end
+_no_winner:
+    mov eax, 0
+_winner_end:
+    mov esp, ebp
+    pop ebp
+    ret
