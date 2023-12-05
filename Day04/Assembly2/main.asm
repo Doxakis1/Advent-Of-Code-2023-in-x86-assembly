@@ -338,7 +338,7 @@ _add_copies_loop_inc:
 
 _close_file:
     ;mov eax, dword [sum]
-    ;call printnum <<<<< Part1
+    ;call printnum ;part 1
     jmp _add_copies
 _close_file2:
     mov eax, dword [sum]
