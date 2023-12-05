@@ -153,8 +153,8 @@ _initialize_buffer_loop:
     cmp ecx, BUFFER_SIZE
     jge _init_numbers
     lea esi, [buffer + ecx]
-    mov [esi], dword 0
-    add ecx, 4
+    mov [esi], byte 0
+    inc ecx
     jmp _initialize_buffer_loop
 _init_numbers:
     xor ecx, ecx
