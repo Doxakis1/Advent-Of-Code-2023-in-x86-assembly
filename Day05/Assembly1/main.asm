@@ -20,6 +20,8 @@
 %define BUFFER_SIZE 1024
 
 extern get_next_line
+extern get_number
+extern fd_printnum
 
 section .data
     filename db 'file.txt', 0
@@ -34,6 +36,11 @@ section .text
     global _start
 
 _start:
+    push ebp
+    mov ebp, esp
+    sub esp, 4 ; index counter
+    
+    mov [esp], dword 0
     mov [fd], dword -1
 _open_file:
     mov eax, open
@@ -45,13 +52,33 @@ _open_file:
     jl _exit
     mov [fd], eax
     lea ebx, [buffer]
-    call get_next_line 
+    call get_next_line
+_print_all_seeds:
+    mov ecx, [esp]
+    lea eax, [buffer + ecx]
+    movzx edx, byte [eax]
+    cmp edx, 0
+    je _close_file
+    call get_number
+    cmp ecx, 1
+    jne _num_found
+    mov ebx, dword [esp]
+    inc ebx
+    mov [esp], ebx
+    jmp _print_all_seeds
+_num_found:
+    mov edx, dword [esp]
+    add edx, ebx
+    mov [esp], edx
+    call fd_printnum
+    jmp _print_all_seeds
 _close_file:
-    lea esi, [buffer]
     mov eax, close
     mov ebx, [fd]
     int 0x80
 _exit:
+    mov esp, ebp
+    pop ebp
     mov eax, exit
     mov ebx, 0
     int 0x80
