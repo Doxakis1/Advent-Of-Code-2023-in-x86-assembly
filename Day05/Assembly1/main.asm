@@ -27,6 +27,7 @@ section .data
     filename db 'file.txt', 0
 section .bss
     fd    resd 1
+    index resd 1
     nums1 resd BUFFER_SIZE
     nums2 resd BUFFER_SIZE
     nums3 resd BUFFER_SIZE
@@ -41,6 +42,7 @@ _start:
     sub esp, 4 ; index counter
     
     mov [esp], dword 0
+    mov [index], dword  0
     mov [fd], dword -1
 _open_file:
     mov eax, open
@@ -53,26 +55,115 @@ _open_file:
     mov [fd], eax
     lea ebx, [buffer]
     call get_next_line
-_print_all_seeds:
-    mov ecx, [esp]
+    cmp eax, dword 0
+    je _close_file ; error case
+    mov [esp], dword 7 ; skip until the seed numbers
+_get_all_seeds:
+    mov ecx, dword [esp]
     lea eax, [buffer + ecx]
-    movzx edx, byte [eax]
-    cmp edx, 0
-    je _close_file
     call get_number
     cmp ecx, 1
-    jne _num_found
-    mov ebx, dword [esp]
-    inc ebx
-    mov [esp], ebx
-    jmp _print_all_seeds
-_num_found:
-    mov edx, dword [esp]
-    add edx, ebx
-    mov [esp], edx
-    call fd_printnum
-    jmp _print_all_seeds
+    je _get_maps
+    mov edx, dword [index]
+    lea edi, [seeds + edx * 4]
+    mov [edi], eax
+    inc edx
+    mov [index], edx
+    mov ecx, dword [esp]
+    add ecx, ebx
+    inc ecx
+    mov [esp], ecx
+    jmp _get_all_seeds
+_get_maps:
+    mov edx, [index]
+    lea edi, [seeds + edx * 4]
+    mov [edi], dword -1
+    mov eax, dword [fd]
+    lea ebx, [buffer]
+    call get_next_line
+    cmp eax, 0
+    je _close_file ; error case
+    mov [index], dword 0
+_get_next_map:
+    mov eax, dword [fd]
+    lea ebx, [buffer]
+    call get_next_line
+    cmp eax, 0
+    je _got_maps ; done
+_get_next_map_loop:
+    mov eax, dword [fd]
+    lea ebx, [buffer]
+    call get_next_line
+    cmp eax, 1 ; found only line so we are done with this
+    jle _get_next_map_end
+    mov [esp], dword 0
+_get_next_map_numbers:
+    mov ecx, dword [esp]
+    lea eax, [buffer + ecx]
+    call get_number
+    cmp ecx, 1
+    je _close_file ; error
+    mov edx, dword [index]
+    lea edi, [nums1 + edx * 4]
+    mov [edi], eax
+    mov ecx, dword [esp]
+    add ecx, ebx
+    inc ecx
+    mov [esp], ecx
+    lea eax, [buffer + ecx]
+    call get_number
+    cmp ecx, 1
+    je _close_file ; error
+    mov edx, dword [index]
+    lea edi, [nums2 + edx * 4]
+    mov [edi], eax
+    mov ecx, dword [esp]
+    add ecx, ebx
+    inc ecx
+    mov [esp], ecx
+    lea eax, [buffer + ecx]
+    call get_number
+    cmp ecx, 1
+    je _close_file ; error
+    mov ebx, dword [edi]
+    mov edx, dword [index]
+    lea edi, [nums3 + edx * 4]
+    add eax, ebx
+    mov [edi], eax
+    inc edx
+    mov [index], edx
+    jmp _get_next_map_loop
+_get_next_map_end:
+    mov edx, dword [index]
+    lea edi, [nums1 + edx * 4]
+    mov [edi], dword -1
+    lea edi, [nums2 + edx * 4]
+    mov [edi], dword -1
+    lea edi, [nums3 + edx * 4]
+    mov [edi], dword -1
+    inc edx
+    mov [index], edx
+    jmp _get_next_map
+
+_got_maps:
+    mov edx, dword [index]
+    lea edi, [nums1 + edx * 4]
+    mov [edi], dword -2
+    lea edi, [nums2 + edx * 4]
+    mov [edi], dword -2
+    lea edi, [nums3 + edx * 4]
+    mov [edi], dword -2
+    inc edx
+    mov [index], edx
+    jmp _close_file
+    
+
 _close_file:
+    mov esi, seeds
+    mov esi, buffer
+    mov esi, nums1
+    mov esi, nums2
+    mov esi, nums3
     mov eax, close
     mov ebx, [fd]
     int 0x80
