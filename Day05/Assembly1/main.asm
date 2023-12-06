@@ -19,6 +19,8 @@
 %define open_mode 0
 %define BUFFER_SIZE 1024
 
+extern get_next_line
+
 section .data
     filename db 'file.txt', 0
 section .bss
@@ -41,10 +43,11 @@ _open_file:
     int 0x80
     cmp eax, 0
     jl _exit
-_test:
-    mov eax, 1
-
+    mov [fd], eax
+    lea ebx, [buffer]
+    call get_next_line 
 _close_file:
+    lea esi, [buffer]
     mov eax, close
     mov ebx, [fd]
     int 0x80
