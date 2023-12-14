@@ -1,5 +1,5 @@
 ; This function reads the next line of an fd into a buffer provided by the caller
-; Fd is passed by eax and location of buffer
+; Fd is passed by eax and location of buffer by ebx
 ; It inserts the NUL terminated string on the buffer and returns on eax the string length
 
 %define read 3
@@ -24,7 +24,7 @@ _read_loop:
     mov edx, dword 1
     int 0x80
     cmp eax, 0
-    je _ret
+    jle _ret
     movzx ebx, byte [ecx]
     mov edx, dword [esp+4]
     inc edx

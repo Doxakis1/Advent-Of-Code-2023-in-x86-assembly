@@ -24,7 +24,7 @@ _read_loop:
     mov edx, dword 1
     int 0x80
     cmp eax, 0
-    je _ret
+    jle _ret
     movzx ebx, byte [ecx]
     mov edx, dword [esp+4]
     inc edx
