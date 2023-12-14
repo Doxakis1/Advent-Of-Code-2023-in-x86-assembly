@@ -14,6 +14,7 @@ section .data
     filename db 'file.txt', 0
     newline db 10, 0
 section .bss
+    answer resd 1
     maps   resd 8
     fd     resd 1
     buffer resb BUFFER_SIZE
@@ -74,6 +75,10 @@ _transform_loop:
     mov ecx, dword  [esp]
     inc ecx
     mov [esp], ecx
+    mov edx, dword [answer]
+    cmp eax, edx
+    jae _transform_loop
+    mov [answer], eax
     jmp _transform_loop
 _transform_ret:
     mov esp, ebp
@@ -137,6 +142,7 @@ _start:
     mov [esp+4], dword 0
     mov [esp], dword 0
     mov [maps], dword 0
+    mov [answer], dword 4294967295 ; unsigned int max
 _open_file:
     mov eax, open
     mov ebx, filename
@@ -235,52 +241,9 @@ _map_done:
     jmp _get_next_map
 _done:
     call transform_seeds
-    mov eax, [esp+12]
-    mov ebx, dword 1 
-    call fd_printnum
-    mov eax, dword  4
-    mov ebx, dword 1
-    mov ecx, newline
-    mov edx, 1
-    int 0x80
-    xor ecx, ecx
-_print_loop:
-    lea esi, dword[seeds + ecx * 4]
-    mov eax, dword  [esi]
+    mov eax, dword [answer]
     mov ebx, 1
-    push ecx
     call fd_printnum
-    mov eax, dword  4
-    mov ebx, dword 1
-    mov ecx, newline
-    mov edx, 1
-    int 0x80
-    pop ecx
-    inc ecx
-    cmp ecx, dword [s_num]
-    jb _print_loop
-;    mov [esp+4], dword 4294967295 ; unsigned int max
-;    mov [esp], dword 0
-;    lea esi, [seeds]
-;_find_smallest:
-;    mov ecx, dword [esp]
-;    mov ebx, dword [s_num]
-;    cmp ecx, ebx
-;    jge _found_smallest
-;    inc ecx
-;    mov [esp], ecx
-;    dec ecx
-;    lea esi, [seeds + ecx * 4]
-;    mov eax, dword [esi]
-;    mov ebx, dword [esp+4]
-;    cmp eax, ebx
-;    ja _find_smallest
-;    mov [esp+4], eax
-;    jmp _find_smallest
-;_found_smallest:
-;    mov eax, [esp+4]
-;    mov ebx, 1
-;    call fd_printnum
 _close_file:
     mov eax, close
     mov ebx, dword [fd]
