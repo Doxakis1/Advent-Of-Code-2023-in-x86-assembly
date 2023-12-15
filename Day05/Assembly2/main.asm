@@ -8,7 +8,8 @@
 extern get_next_line
 extern get_number
 extern fd_printnum
-
+extern uint32_min
+extern uint32_max
 
 section .data
     filename db 'file.txt', 0
@@ -31,7 +32,7 @@ section .text
 transform_seeds: 
     push ebp
     mov ebp, esp
-    sub esp, 12 ; 3 ints
+    sub esp, 28 ; 7 ints
     mov [esp], dword 0
     mov [esp + 4], dword 0
     mov [esp + 8], dword 0
@@ -44,52 +45,43 @@ _get_next_range:
     inc ecx
     lea edi, [seeds + ecx * 4] ; upper limit
     mov eax, dword [esi]
-    mov [esp], eax
+    mov [esp+8], eax ; lower limit
     mov ebx, dword [edi]
     add eax, ebx
-    mov [esp+8], eax
-_transform_loop:
-    mov eax, dword [esp]
-    mov ebx, dword [esp+8]
-    cmp eax, ebx
-    jae _inc_range
-    mov ebx, 0
-    push ebx
-    call pass_through_range
-    pop ebx
-    inc ebx
-    push ebx
-    call pass_through_range
-    pop ebx
-    inc ebx
-    push ebx
-    call pass_through_range
-    pop ebx
-    inc ebx
-    push ebx
-    call pass_through_range
-    pop ebx
-    inc ebx
-    push ebx
-    call pass_through_range
-    pop ebx
-    inc ebx
-    push ebx
-    call pass_through_range
-    pop ebx
-    inc ebx
-    push ebx
-    call pass_through_range
-    pop ebx
-    mov ecx, dword  [esp]
-    inc ecx
-    mov [esp], ecx
-    mov [esp], ecx
-    mov edx, dword [answer]
-    cmp eax, edx
-    jae _transform_loop
+    mov [esp+12], eax ;upperlimit
+    mov [esp+20], dword 0
+    mov [esp+24], dword 4294967295
+_get_next_value:
+    mov eax, dword [esp+24]
+    mov ebx, dword [answer]
+    call uint32_min
     mov [answer], eax
+    mov eax, dword  [esp+8]
+    mov edx, dword [esp+20]
+    add eax, edx
+    mov edx, dword [esp+12]
+    cmp eax, edx
+    ja _inc_range
+    mov [esp+8], eax
+    mov [esp+24], eax
+    mov [esp+16], dword 0
+    mov [esp+20], dword 4294967295
+_transform_loop:
+    mov ebx, dword [esp+16]
+    cmp ebx, 7
+    ja _get_next_value
+    mov eax, dword [esp+24]
+    call pass_through_range
+    mov [esp+24], eax
+    mov ebx, dword [esp+16]
+    inc ebx
+    mov [esp+16], ebx
+    mov ebx, ecx
+    mov eax, dword [esp+20]
+    call uint32_min
+    mov [esp+20], eax
     jmp _transform_loop
+
 _inc_range:
     mov ecx, dword [esp+4]
     add ecx, 2
@@ -112,6 +104,7 @@ pass_through_range: ; this function needs the eax to hold the number we are test
     lea edx, [maps + ebx * 4]
     mov ecx, dword [edx]
     mov [esp+8], ecx ; holds upperlimit
+    mov [esp+12], dword 4294967295
 _transform_num:
     mov ecx, dword [esp + 4]
     mov ebx, dword [esp + 8]
@@ -123,12 +116,20 @@ _try_ranges:
     mov eax, dword [esp]
     mov ebx, dword [edi]
     cmp eax, ebx
-    jb _try_range_inc
+    jae _passed_first
+    sub ebx, eax
+    mov eax, dword [esp+12]
+    call uint32_min
+    mov [esp+12], eax
+    jmp _try_range_inc
+_passed_first:
     sub eax, ebx
     lea edi, [array3 + ecx * 4]
     mov ebx, dword [edi]
     cmp eax, ebx
     ja _try_range_inc
+    sub ebx, eax
+    mov [esp+12], ebx
     lea edi, [array1 + ecx * 4]
     mov ebx, dword [edi]
     add eax, ebx
@@ -140,11 +141,15 @@ _try_range_inc:
     mov [esp+4], ecx
     jmp _transform_num
 _pass_through_range_ret:
+    mov ecx, dword [esp+12]
+    cmp ecx, 0
+    jne _not_zero
+    inc ecx
+_not_zero:
     mov eax, dword [esp]
     mov esp, ebp
     pop ebp
     ret
-
 
 _start:
     pop ebp
