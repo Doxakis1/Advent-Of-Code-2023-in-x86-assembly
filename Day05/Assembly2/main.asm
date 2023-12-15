@@ -31,17 +31,28 @@ section .text
 transform_seeds: 
     push ebp
     mov ebp, esp
-    sub esp, 4 ; 1 int
+    sub esp, 12 ; 3 ints
     mov [esp], dword 0
-
-_transform_loop:
-    mov ecx, dword [esp]
-    mov ebx, dword [s_num]
-    cmp ecx, ebx
+    mov [esp + 4], dword 0
+    mov [esp + 8], dword 0
+_get_next_range:
+    mov ecx,dword [esp+4]
+    mov edx,dword [s_num]
+    cmp ecx, edx
     jae _transform_ret
-    lea esi, [seeds + ecx * 4]
-    push esi
+    lea esi, [seeds + ecx * 4] ; lower limit
+    inc ecx
+    lea edi, [seeds + ecx * 4] ; upper limit
     mov eax, dword [esi]
+    mov [esp], eax
+    mov ebx, dword [edi]
+    add eax, ebx
+    mov [esp+8], eax
+_transform_loop:
+    mov eax, dword [esp]
+    mov ebx, dword [esp+8]
+    cmp eax, ebx
+    jae _inc_range
     mov ebx, 0
     push ebx
     call pass_through_range
@@ -70,16 +81,20 @@ _transform_loop:
     push ebx
     call pass_through_range
     pop ebx
-    pop esi
-    mov [esi], eax
     mov ecx, dword  [esp]
     inc ecx
+    mov [esp], ecx
     mov [esp], ecx
     mov edx, dword [answer]
     cmp eax, edx
     jae _transform_loop
     mov [answer], eax
     jmp _transform_loop
+_inc_range:
+    mov ecx, dword [esp+4]
+    add ecx, 2
+    mov [esp+4], ecx
+    jmp _get_next_range
 _transform_ret:
     mov esp, ebp
     pop ebp

@@ -1,4 +1,3 @@
-
 %define BUFFER_SIZE 1024
 %define exit 1
 %define read 3
@@ -13,7 +12,10 @@ extern fd_printnum
 
 section .data
     filename db 'file.txt', 0
+    newline db 10, 0
 section .bss
+    answer resd 1
+    maps   resd 8
     fd     resd 1
     buffer resb BUFFER_SIZE
     s_num  resd 1
@@ -26,15 +28,121 @@ section .bss
 section .text
     global _start
 
+transform_seeds: 
+    push ebp
+    mov ebp, esp
+    sub esp, 4 ; 1 int
+    mov [esp], dword 0
+
+_transform_loop:
+    mov ecx, dword [esp]
+    mov ebx, dword [s_num]
+    cmp ecx, ebx
+    jae _transform_ret
+    lea esi, [seeds + ecx * 4]
+    push esi
+    mov eax, dword [esi]
+    mov ebx, 0
+    push ebx
+    call pass_through_range
+    pop ebx
+    inc ebx
+    push ebx
+    call pass_through_range
+    pop ebx
+    inc ebx
+    push ebx
+    call pass_through_range
+    pop ebx
+    inc ebx
+    push ebx
+    call pass_through_range
+    pop ebx
+    inc ebx
+    push ebx
+    call pass_through_range
+    pop ebx
+    inc ebx
+    push ebx
+    call pass_through_range
+    pop ebx
+    inc ebx
+    push ebx
+    call pass_through_range
+    pop ebx
+    pop esi
+    mov [esi], eax
+    mov ecx, dword  [esp]
+    inc ecx
+    mov [esp], ecx
+    mov edx, dword [answer]
+    cmp eax, edx
+    jae _transform_loop
+    mov [answer], eax
+    jmp _transform_loop
+_transform_ret:
+    mov esp, ebp
+    pop ebp
+    ret
+
+pass_through_range: ; this function needs the eax to hold the number we are testing and ebx to hold my array number
+    push ebp
+    mov ebp, esp
+    sub esp, 16 ; 4 ints
+    mov [esp], eax
+    lea edx, [maps + ebx * 4]
+    mov ecx, dword [edx]
+    mov [esp+4], ecx ; holds start
+    inc ebx
+    lea edx, [maps + ebx * 4]
+    mov ecx, dword [edx]
+    mov [esp+8], ecx ; holds upperlimit
+_transform_num:
+    mov ecx, dword [esp + 4]
+    mov ebx, dword [esp + 8]
+    cmp ecx, ebx
+    jge _pass_through_range_ret
+_try_ranges:
+    mov ecx, dword [esp+4]
+    lea edi, [array2 + ecx * 4]
+    mov eax, dword [esp]
+    mov ebx, dword [edi]
+    cmp eax, ebx
+    jb _try_range_inc
+    sub eax, ebx
+    lea edi, [array3 + ecx * 4]
+    mov ebx, dword [edi]
+    cmp eax, ebx
+    ja _try_range_inc
+    lea edi, [array1 + ecx * 4]
+    mov ebx, dword [edi]
+    add eax, ebx
+    mov [esp], eax
+    jmp _pass_through_range_ret
+_try_range_inc:
+    mov ecx, [esp+4]
+    inc ecx
+    mov [esp+4], ecx
+    jmp _transform_num
+_pass_through_range_ret:
+    mov eax, dword [esp]
+    mov esp, ebp
+    pop ebp
+    ret
+
+
 _start:
     pop ebp
     mov ebp, esp
     mov eax, dword -1
     mov [fd], eax
-    sub esp, 12 ; 3 ints
+    sub esp, 16 ; 4 ints
+    mov [esp+12], dword 1 ; holds curr map number
     mov [esp+8], dword 0
     mov [esp+4], dword 0
     mov [esp], dword 0
+    mov [maps], dword 0
+    mov [answer], dword 4294967295 ; unsigned int max
 _open_file:
     mov eax, open
     mov ebx, filename
@@ -85,7 +193,7 @@ _get_next_map:
     call get_next_line
     cmp eax, 1
     jle _done ; this line should only have the map key
-    mov [s_arr], dword 0
+    ; mov [s_arr], dword 0
 _get_next_map_line:
     mov eax, dword [fd]
     lea ebx, [buffer]
@@ -123,71 +231,17 @@ _get_map_values:
     mov [s_arr], ecx
     jmp _get_next_map_line
 _got_map:
-    mov [esp], dword 0
-_tranform_nums:
-    mov ecx, dword [esp]
-    mov ebx, dword [s_num]
-    cmp ecx, ebx
-    jge _map_done
-    lea edi, [seeds + ecx * 4]
-    mov eax, dword [edi]
-    mov [esp+4], eax
-    mov [esp+8], dword 0
-_try_ranges: 
-    mov ecx, dword [esp+8]
-    mov ebx, dword [s_arr]
-    cmp ecx, ebx
-    jge _got_map_loop_inc
-    lea edi, [array2 + ecx * 4]
-    mov eax, dword [edi]
-    mov ebx, dword [esp+4]
-    cmp ebx, eax
-    jb _try_range_inc
-    sub ebx, eax
-    lea edi, [array3 + ecx * 4]
-    mov eax, dword [edi]
-    cmp ebx, eax
-    ja _try_range_inc
-    lea edi, [array1 + ecx * 4]
-    mov eax, dword [edi]
-    mov ecx, [esp]
-    lea esi, [seeds + ecx * 4]
-    add ebx, eax
-    mov [esi], ebx
-    jmp _got_map_loop_inc
-_try_range_inc:
-    mov ecx, dword [esp+8]
+    mov eax, dword [s_arr]
+    mov ecx, dword [esp+12]
+    lea edi, [maps + ecx * 4]
+    mov [edi], eax
     inc ecx
-    mov [esp+8], ecx
-    jmp _try_ranges
-_got_map_loop_inc:
-    mov ecx, dword [esp]
-    inc ecx
-    mov [esp], ecx
-    jmp _tranform_nums
+    mov [esp+12], ecx
 _map_done:
     jmp _get_next_map
 _done:
-    mov [esp+4], dword 4294967295 ; unsigned int max
-    mov [esp], dword 0
-    lea esi, [seeds]
-_find_smallest:
-    mov ecx, dword [esp]
-    mov ebx, dword [s_num]
-    cmp ecx, ebx
-    jge _found_smallest
-    inc ecx
-    mov [esp], ecx
-    dec ecx
-    lea esi, [seeds + ecx * 4]
-    mov eax, dword [esi]
-    mov ebx, dword [esp+4]
-    cmp eax, ebx
-    ja _find_smallest
-    mov [esp+4], eax
-    jmp _find_smallest
-_found_smallest:
-    mov eax, [esp+4]
+    call transform_seeds
+    mov eax, dword [answer]
     mov ebx, 1
     call fd_printnum
 _close_file:
