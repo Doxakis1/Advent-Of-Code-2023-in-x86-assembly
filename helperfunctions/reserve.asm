@@ -15,7 +15,6 @@ section .bss
 section .text
     global reserve
     global free
-    global _start
     global reserve_init
     global reserve_clear
 
@@ -28,11 +27,12 @@ reserve_clear: ; call at start of the program
     mov [brk_end], ebx
     mov esp, ebp
     mov eax, 1
+    mov esp, ebp
     pop ebp
     ret
 
 
-reserved_init: ; this is only called by the reserve function if initial heap hasnt been allocated
+reserve_init: ; this is only called by the reserve function if initial heap hasnt been allocated
 ; returns a non-zero value on eax if everything happened properly, else 0
     push ebp
     mov ebp, esp
